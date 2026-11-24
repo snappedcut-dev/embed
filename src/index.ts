@@ -101,9 +101,24 @@ export async function mount(
   frame.title = 'Snapped Cut editor';
   frame.style.cssText = 'border:0;width:100%;height:100%;display:block';
   frame.allow = 'clipboard-write; fullscreen';
-  /* No `allow-same-origin`: the frame is a different origin to us and must
-     stay one. With it, a frame on our origin could reach into this page. */
-  frame.setAttribute('sandbox', 'allow-scripts allow-downloads allow-popups allow-forms');
+  /* `allow-same-origin` is required, and it is safe here.
+     Required: without it the frame has an *opaque* origin. Everything it posts
+     then arrives as `event.origin === 'null'`, which can never equal
+     `config.origin`, and anything posted *to* it at a named origin is dropped.
+     The origin check in `isFrameMessage` silently kills both directions — the
+     editor renders and then nothing ever answers, which is the worst shape a
+     bug can take.
+     Safe: it makes the frame same-origin with *its own* origin, not with your
+     page. A sandboxed frame can only remove its own sandbox when it is
+     same-origin with the parent document, and this one is cross-origin by
+     construction. What keeps a hostile frame out is `event.source ===
+     frame.contentWindow` — unforgeable — not the origin string.
+     It also restores storage, which an opaque origin denies, and the editor
+     keeps projects in IndexedDB. */
+  frame.setAttribute(
+    'sandbox',
+    'allow-scripts allow-same-origin allow-downloads allow-popups allow-forms',
+  );
 
   const listeners = new Map<string, Set<(payload: never) => void>>();
   const pending = new Map<number, { resolve: (v: never) => void; reject: (e: unknown) => void }>();
