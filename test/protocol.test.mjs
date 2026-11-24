@@ -69,3 +69,10 @@ test('EmbedError keeps its code for branching', () => {
   assert.equal(e.code, 'token_expired');
   assert.ok(e instanceof Error);
 });
+
+test('features travel in the query, and the token stays in the hash', () => {
+  const url = new URL(frameUrl({ frameId: 'f1', publishableKey: 'pk_test_x', token: 'tok', features: { formats: ['mp4'], stock: false } }));
+  assert.deepEqual(JSON.parse(url.searchParams.get('features')), { formats: ['mp4'], stock: false });
+  assert.equal(url.searchParams.get('t'), null);
+  assert.equal(url.hash, '#t=tok');
+});

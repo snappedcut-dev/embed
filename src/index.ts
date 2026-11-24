@@ -13,35 +13,96 @@ import {
 
 export { EmbedError, PROTOCOL_VERSION, type EmbedErrorCode, type ExportFormat };
 
-export type EmbedTheme = { mode?: 'dark' | 'light'; accent?: string };
+/**
+ * Theme tokens, the same names snapnedit takes, so one object themes both.
+ * Colours are any CSS colour; `radius` is px (number) or a px/rem string;
+ * `font` is a font-family list the host page has already loaded. Sent again
+ * with `setTheme` to switch live; each call replaces the last, so send the
+ * whole set. `mode` is accepted and ignored — the tokens are the theme.
+ */
+export type EmbedTheme = {
+  mode?: 'dark' | 'light';
+  bg?: string;
+  bg2?: string;
+  surface?: string;
+  surface2?: string;
+  line?: string;
+  line2?: string;
+  text?: string;
+  dim?: string;
+  accent?: string;
+  accentText?: string;
+  radius?: number | string;
+  font?: string;
+};
+
+export type EmbedPanel = 'text' | 'audio' | 'captions' | 'effects' | 'mask' | 'scenes' | 'keyframes' | 'comments';
+
+/**
+ * What the editor shows. Mint the token with `features` to set the ceiling —
+ * it is signed, so the page cannot exceed it — and pass `features` here to
+ * narrow it further. Defaults: stock, assistant, projects and share off;
+ * branding on; every panel; `formats: ['mp4']`.
+ */
+export type EmbedFeatures = {
+  stock?: boolean;
+  assistant?: boolean;
+  projects?: boolean;
+  share?: boolean;
+  branding?: boolean;
+  panels?: EmbedPanel[];
+  formats?: ExportFormat[];
+};
 
 export type EmbedConfig = {
-  /** `pk_live_…` from your dashboard. Public by design; locked to an origin allowlist. */
+  /** `pk_live_…` or `pk_test_…` from your dashboard. Public by design; locked to an origin allowlist. */
   publishableKey?: string;
-  /** A token you minted server-side. Carries an `endUserId` for attribution. */
+  /** A token you minted server-side. Required to export: it says who pays. */
   token?: string;
   /** Called when the frame says its token is about to expire. Return a fresh one. */
   getToken?: () => Promise<string> | string;
   /** Override for a self-hosted install. */
   origin?: string;
+  /** `en` or `es`. */
   locale?: string;
   theme?: EmbedTheme;
-  /** A project to open on load — a bundle Blob, or an https: URL to one. */
+  features?: EmbedFeatures;
+  /** A project to open on load: a bundle from `getProject()`, a media Blob, or an https: URL to either. */
   project?: Blob | string;
 };
 
-export type ExportOptions = { scale?: number; targetWidth?: number; quality?: number };
-export type ExportResult = {
-  blob: Blob;
+export type ExportOptions = {
+  /** Output width in px; the height keeps the aspect ratio. Both are rounded to even, 16–7680. */
+  targetWidth?: number;
+  /** Multiplies the project size, when `targetWidth` is not given. */
+  scale?: number;
+  /** 0–1, five steps; 0.5 is the default. */
+  quality?: number;
+  /** A presigned https PUT on your storage. The render goes there, and the result carries no file. */
+  uploadUrl?: string;
+};
+
+/** The render types a session can be billed for. */
+export type JobOperation = 'cloud-render' | 'cloud-render-4k';
+
+type ExportFacts = {
   format: ExportFormat;
   width: number;
   height: number;
   bytes: number;
+  jobId: string;
+  credits: number;
 };
+export type ExportResult =
+  | (ExportFacts & { uploaded?: false; blob: Blob })
+  | (ExportFacts & { uploaded: true; contentType: string });
+
+/** What a delivery to `uploadUrl` answers with: the facts, not the file. */
+export type Uploaded = { uploaded: true; contentType: string; bytes: number };
 
 export type JobEvent = {
   jobId: string;
-  operation: string;
+  operation: JobOperation;
   status: 'started' | 'succeeded' | 'failed';
   credits: number;
   endUserId: string | null;
@@ -58,10 +119,17 @@ export type EditorEvents = {
 };
 
 export type EditorHandle = {
+  /** Media to add, or a bundle from `getProject()` to reopen. */
   load(source: Blob | string): Promise<void>;
   export(format: ExportFormat, options?: ExportOptions): Promise<ExportResult>;
-  getProject(): Promise<unknown>;
+  /** The whole project — timeline and media — as a bundle `load` and `project` take back. */
+  getProject(): Promise<Blob>;
+  /** The same bundle, PUT to your presigned https URL instead of returned. */
+  getProject(options: { uploadUrl: string }): Promise<Uploaded>;
+  /** Switches the theme live, without a remount. */
+  setTheme(theme: EmbedTheme): void;
   on<K extends keyof EditorEvents>(event: K, fn: (payload: EditorEvents[K]) => void): () => void;
+  /** Removes the frame; focus goes back to where it was before the editor took it. */
   destroy(): void;
   readonly frame: HTMLIFrameElement;
 };
@@ -71,11 +139,9 @@ const TIMEOUT_MS = 60_000;
 /**
  * Loads the Snapped Cut editor into `target` and resolves with a handle to it.
  *
- * The frame is a **thin client**: decode, compositing and encode all happen on
- * Snapped Cut's servers, so nothing heavy ships into the host page and no
- * engine code reaches the visitor. `load` and `export` are therefore round
- * trips, not local calls — every one is work we do and meter, and each reports
- * itself through the `job` event with the credits it cost.
+ * Editing and preview run in the visitor's browser. `export` renders on
+ * Snapped Cut's servers, billed to the token's session, and reports itself
+ * through the `job` event with the credits it cost.
  */
 export async function mount(
   target: string | HTMLElement,
@@ -95,8 +161,14 @@ export async function mount(
 
   const origin = (config.origin ?? DEFAULT_ORIGIN).replace(/\/+$/, '');
   const frameId = newFrameId();
-
   const frame = document.createElement('iframe');
+  // The last thing in the page focused before the editor took focus, so
+  // destroy() can put it back rather than drop it on <body>.
+  let returnFocus: HTMLElement | null = null;
+  const onFocusIn = (event: FocusEvent) => {
+    if (event.target !== frame && event.target instanceof HTMLElement) returnFocus = event.target;
+  };
+  document.addEventListener('focusin', onFocusIn);
   frame.src = frameUrl({ ...config, origin, frameId });
   frame.title = 'Snapped Cut editor';
   frame.style.cssText = 'border:0;width:100%;height:100%;display:block';
@@ -113,8 +185,7 @@ export async function mount(
      same-origin with the parent document, and this one is cross-origin by
      construction. What keeps a hostile frame out is `event.source ===
      frame.contentWindow` — unforgeable — not the origin string.
-     It also restores storage, which an opaque origin denies, and the editor
-     keeps projects in IndexedDB. */
+     It also restores storage, which an opaque origin denies. */
   frame.setAttribute(
     'sandbox',
     'allow-scripts allow-same-origin allow-downloads allow-popups allow-forms',
@@ -178,7 +249,10 @@ export async function mount(
       const slot = pending.get(data.id);
       if (!slot) return;
       pending.delete(data.id);
-      if (data.error) slot.reject(new EmbedError(data.error.code, data.error.message));
+      if (data.error) {
+        const { code, message, ...details } = data.error;
+        slot.reject(new EmbedError(code, message, details));
+      }
       else slot.resolve(data.payload as never);
       return;
     }
@@ -215,6 +289,7 @@ export async function mount(
     void hello;
   } catch (error) {
     window.removeEventListener('message', onMessage);
+    document.removeEventListener('focusin', onFocusIn);
     frame.remove();
     throw error;
   }
@@ -223,7 +298,8 @@ export async function mount(
     frame,
     load: (source) => request<void>('load', { source }),
     export: (format, options) => request<ExportResult>('export', { format, ...options }),
-    getProject: () => request<unknown>('project'),
+    getProject: ((options?: { uploadUrl: string }) => request('project', options)) as EditorHandle['getProject'],
+    setTheme: (theme) => post('theme', theme),
     on(event, fn) {
       const set = listeners.get(event) ?? new Set();
       listeners.set(event, set);
@@ -234,12 +310,15 @@ export async function mount(
       if (destroyed) return;
       destroyed = true;
       window.removeEventListener('message', onMessage);
+      document.removeEventListener('focusin', onFocusIn);
       for (const { reject } of pending.values()) {
         reject(new EmbedError('unsupported', 'This embed was destroyed.'));
       }
       pending.clear();
       listeners.clear();
+      const hadFocus = document.activeElement === frame;
       frame.remove();
+      if (hadFocus && returnFocus?.isConnected) returnFocus.focus();
     },
   };
 }

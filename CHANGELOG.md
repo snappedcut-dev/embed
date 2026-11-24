@@ -3,6 +3,42 @@
 Every release is tagged and published from CI with npm provenance. Versions
 follow semver; the embed protocol has its own version in the `ready` event.
 
+## 0.2.0 - 2026-11-24
+
+Protocol `v` is still 1. Everything below is additive on the wire. The types
+changed, which is why this is a minor release (pre-1.0).
+
+### Added
+
+- `features` on `mount()`, on the script tag (`data-features`) and on the
+  token: hide stock, the assistant, projects, share and branding, pick the
+  panels, and choose which export formats are allowed. The token's features are
+  signed and set the ceiling; the page can only narrow them. The server checks
+  `formats` again before it renders anything.
+- `setTheme(theme)`, and the full token set: `bg`, `bg2`, `surface`,
+  `surface2`, `line`, `line2`, `text`, `dim`, `accent`, `accentText`, `radius`
+  and `font`. The React wrapper now sends a theme change through `setTheme`
+  instead of remounting.
+- `export(..., { uploadUrl })`. The result is typed as a union: with
+  `uploaded: true` it carries no blob. The result also includes `jobId` and
+  `credits`.
+- New error codes `credits_exhausted` and `rate_limited`. A
+  `rate_limited` error carries `details.retryAfterMs`.
+- `getProject()` now returns a bundle `Blob` (timeline plus media), which
+  `load()` and `project` reopen.
+- `JobEvent.operation` is typed as `'cloud-render' | 'cloud-render-4k'`.
+- `protocol.json`: the JSON Schema for every message in both directions,
+  importable as `@snappedcut/embed/protocol.json`.
+- Versioning rules (README), `ACCESSIBILITY.md`, and focus is handed back to
+  the host when `destroy()` runs.
+
+### Changed
+
+- `ExportFormat` is now `mp4 | webm | mov | mkv`, the formats the server
+  actually renders. `gif` and `png` were never rendered by the embed.
+- Corrected the comments and README that still called the frame a thin client.
+  Editing runs in the browser, and the export renders on our servers.
+
 ## 0.1.2 - 2026-11-24
 
 ### Fixed

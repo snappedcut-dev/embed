@@ -10,7 +10,8 @@
 export const PROTOCOL_VERSION = 1;
 export const DEFAULT_ORIGIN = 'https://snappedcut.com';
 
-export type ExportFormat = 'webm' | 'mp4' | 'mkv' | 'mov' | 'gif' | 'png';
+/** What the server renders. Which of these a session may use is its `features.formats`. */
+export type ExportFormat = 'mp4' | 'webm' | 'mov' | 'mkv';
 
 export type EmbedErrorCode =
   | 'invalid_input'
@@ -21,6 +22,8 @@ export type EmbedErrorCode =
   | 'unsupported'
   | 'network_error'
   | 'export_failed'
+  | 'credits_exhausted'
+  | 'rate_limited'
   | 'internal';
 
 export class EmbedError extends Error {
@@ -55,7 +58,7 @@ export type FrameMessage = {
   readonly type: FrameEventName;
   readonly id?: number;
   readonly payload?: unknown;
-  readonly error?: { code: EmbedErrorCode; message: string };
+  readonly error?: { code: EmbedErrorCode; message: string; retryAfterMs?: number };
 };
 
 /**
@@ -92,6 +95,7 @@ export function frameUrl(config: {
   publishableKey?: string | undefined;
   token?: string | undefined;
   locale?: string | undefined;
+  features?: unknown;
   frameId: string;
 }): string {
   const origin = (config.origin ?? DEFAULT_ORIGIN).replace(/\/+$/, '');
@@ -100,6 +104,8 @@ export function frameUrl(config: {
   url.searchParams.set('frame', config.frameId);
   if (config.publishableKey) url.searchParams.set('key', config.publishableKey);
   if (config.locale) url.searchParams.set('locale', config.locale);
+  // Not a secret, and only ever narrows what the token grants, so the query is fine.
+  if (config.features) url.searchParams.set('features', JSON.stringify(config.features));
   // The token goes in the hash, not the query: a hash is not sent to the
   // server, does not reach access logs and does not survive a referrer header.
   return config.token ? `${url.toString()}#t=${encodeURIComponent(config.token)}` : url.toString();

@@ -38,6 +38,12 @@ export function configFromScript(script: Scriptish): { target: string | null; co
   const token = attr('token');
   const locale = attr('locale');
   const origin = attr('origin');
+  let features: unknown;
+  try {
+    features = attr('features') ? JSON.parse(attr('features')!) : undefined;
+  } catch {
+    features = undefined;
+  }
 
   return {
     target: script.getAttribute('data-target'),
@@ -47,6 +53,7 @@ export function configFromScript(script: Scriptish): { target: string | null; co
       ...(token ? { token } : {}),
       ...(locale ? { locale } : {}),
       ...(origin ? { origin } : {}),
+      ...(features ? { features: features as NonNullable<EmbedConfig["features"]> } : {}),
     },
   };
 }

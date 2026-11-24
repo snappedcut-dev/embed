@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://snappedcut.com/embed/protocol/v1.json",
+  "title": "Snapped Cut embed protocol, v1",
+  "description": "Every postMessage between a host page and the editor frame. Host messages carry source 'snappedcut-host'; frame messages carry 'snappedcut'. Both carry v (1) and the frameId the host issued. A message with an id expects a 'reply' with the same id. Versioning rules are in README.md under 'Versioning'.",
+  "oneOf": [
+    { "$ref": "#/$defs/host" },
+    { "$ref": "#/$defs/frame" }
+  ],
+  "$defs": {
+    "envelope": {
+      "type": "object",
+      "required": ["source", "v", "frameId", "type"],
+      "properties": {
+        "v": { "const": 1 },
+        "frameId": { "type": "string", "minLength": 1 },
+        "id": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "host": {
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "properties": { "source": { "const": "snappedcut-host" } },
+      "oneOf": [
+        { "properties": { "type": { "const": "load" }, "payload": { "type": "object", "required": ["source"], "properties": { "source": { "description": "A Blob (media or a project bundle) or an https: URL to one" } } } } },
+        { "properties": { "type": { "const": "export" }, "payload": { "$ref": "#/$defs/exportRequest" } } },
+        { "properties": { "type": { "const": "project" } }, "description": "Replied with a project bundle Blob" },
+        { "properties": { "type": { "const": "theme" }, "payload": { "$ref": "#/$defs/theme" } } },
+        { "properties": { "type": { "const": "token" }, "payload": { "type": "object", "required": ["token"], "properties": { "token": { "type": "string" } } } } }
+      ]
+    },
+    "frame": {
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "properties": { "source": { "const": "snappedcut" } },
+      "oneOf": [
+        { "properties": { "type": { "const": "ready" }, "payload": { "type": "object", "required": ["version"], "properties": { "version": { "type": "string" } } } } },
+        { "properties": { "type": { "const": "error" }, "payload": { "$ref": "#/$defs/error" } } },
+        { "properties": { "type": { "const": "change" }, "payload": { "type": "object", "required": ["duration", "clips"], "properties": { "duration": { "type": "number" }, "clips": { "type": "integer" } } } } },
+        { "properties": { "type": { "const": "export" }, "payload": { "$ref": "#/$defs/exportResult" } } },
+        { "properties": { "type": { "const": "job" }, "payload": { "$ref": "#/$defs/job" } } },
+        { "properties": { "type": { "const": "token-expiring" } } },
+        { "properties": { "type": { "const": "reply" }, "payload": {}, "error": { "$ref": "#/$defs/error" } }, "required": ["id"] }
+      ]
+    },
+    "format": { "enum": ["mp4", "webm", "mov", "mkv"] },
+    "exportRequest": {
+      "type": "object",
+      "required": ["format"],
+      "properties": {
+        "format": { "$ref": "#/$defs/format" },
+        "targetWidth": { "type": "number", "exclusiveMinimum": 0 },
+        "scale": { "type": "number", "exclusiveMinimum": 0 },
+        "quality": { "type": "number", "minimum": 0, "maximum": 1 },
+        "uploadUrl": { "type": "string", "format": "uri" }
+      }
+    },
+    "exportResult": {
+      "type": "object",
+      "required": ["format", "width", "height", "bytes", "jobId", "credits"],
+      "properties": {
+        "format": { "$ref": "#/$defs/format" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "bytes": { "type": "integer" },
+        "jobId": { "type": "string" },
+        "credits": { "type": "integer" },
+        "uploaded": { "type": "boolean" },
+        "contentType": { "type": "string" },
+        "blob": { "description": "The file, when there was no uploadUrl" }
+      }
+    },
+    "job": {
+      "type": "object",
+      "required": ["jobId", "operation", "status", "credits", "endUserId"],
+      "properties": {
+        "jobId": { "type": "string" },
+        "operation": { "enum": ["cloud-render", "cloud-render-4k"] },
+        "status": { "enum": ["started", "succeeded", "failed"] },
+        "credits": { "type": "integer" },
+        "endUserId": { "type": ["string", "null"] },
+        "durationMs": { "type": "number" },
+        "error": { "type": "string" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "enum": ["invalid_input", "mount_failed", "token_expired", "unauthorized", "origin_not_allowed", "unsupported", "network_error", "export_failed", "credits_exhausted", "rate_limited", "internal"] },
+        "message": { "type": "string" },
+        "retryAfterMs": { "type": "number" }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["dark", "light"] },
+        "bg": { "type": "string" }, "bg2": { "type": "string" },
+        "surface": { "type": "string" }, "surface2": { "type": "string" },
+        "line": { "type": "string" }, "line2": { "type": "string" },
+        "text": { "type": "string" }, "dim": { "type": "string" },
+        "accent": { "type": "string" }, "accentText": { "type": "string" },
+        "radius": { "type": ["number", "string"] },
+        "font": { "type": "string" }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stock": { "type": "boolean" },
+        "assistant": { "type": "boolean" },
+        "projects": { "type": "boolean" },
+        "share": { "type": "boolean" },
+        "branding": { "type": "boolean" },
+        "panels": { "type": "array", "items": { "enum": ["text", "audio", "captions", "effects", "mask", "scenes", "keyframes", "comments"] } },
+        "formats": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/format" } }
+      }
+    }
+  }
+}

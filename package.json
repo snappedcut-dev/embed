@@ -1,6 +1,6 @@
 {
   "name": "@snappedcut/embed",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Put the Snapped Cut video editor in your own page. One script tag, mount(), or React.",
   "license": "MIT",
   "type": "module",
@@ -18,11 +18,15 @@
     "./loader": {
       "types": "./dist/loader.d.ts",
       "default": "./dist/loader.js"
-    }
+    },
+    "./protocol.json": "./protocol.json"
   },
   "files": [
     "dist",
+    "protocol.json",
     "README.md",
+    "ACCESSIBILITY.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "sideEffects": [

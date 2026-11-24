@@ -33,11 +33,18 @@ export function SnappedCutEditor(props: SnappedCutEditorProps): React.ReactEleme
     origin,
     locale,
     theme,
+    features,
     project,
   } = props;
 
   const host = useRef<HTMLDivElement>(null);
   const handlers = useRef({ onReady, onError, onChange, onExport, onJob, getToken });
+  const editorRef = useRef<EditorHandle | null>(null);
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  // Compared as JSON: an inline object literal is a new object every render.
+  const featuresKey = features ? JSON.stringify(features) : '';
+  const themeKey = theme ? JSON.stringify(theme) : '';
   const [error, setError] = useState<Error | null>(null);
 
   handlers.current = { onReady, onError, onChange, onExport, onJob, getToken };
@@ -54,7 +61,8 @@ export function SnappedCutEditor(props: SnappedCutEditorProps): React.ReactEleme
       ...(token ? { token } : {}),
       ...(origin ? { origin } : {}),
       ...(locale ? { locale } : {}),
-      ...(theme ? { theme } : {}),
+      ...(themeRef.current ? { theme: themeRef.current } : {}),
+      ...(featuresKey ? { features: JSON.parse(featuresKey) } : {}),
       ...(project ? { project } : {}),
       getToken: () => handlers.current.getToken?.() ?? '',
     })
@@ -63,6 +71,7 @@ export function SnappedCutEditor(props: SnappedCutEditorProps): React.ReactEleme
         // is orphaned in the DOM with a live message listener.
         if (cancelled) { handle.destroy(); return; }
         editor = handle;
+        editorRef.current = handle;
         handle.on('error', (e) => handlers.current.onError?.(e));
         handle.on('change', (e) => handlers.current.onChange?.(e));
         handle.on('export', (e) => handlers.current.onExport?.(e));
@@ -77,9 +86,15 @@ export function SnappedCutEditor(props: SnappedCutEditorProps): React.ReactEleme
 
     return () => {
       cancelled = true;
+      editorRef.current = null;
       editor?.destroy();
     };
-  }, [publishableKey, token, origin, locale, theme, project]);
+  }, [publishableKey, token, origin, locale, featuresKey, project]);
+
+  // A theme change is a message, not a remount: the seller keeps their edit.
+  useEffect(() => {
+    if (themeKey) editorRef.current?.setTheme(JSON.parse(themeKey));
+  }, [themeKey]);
 
   if (error && !onError) throw error;
   return <div ref={host} className={className} style={{ height: '100%', ...style }} />;
