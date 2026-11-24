@@ -7,24 +7,64 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./react": { "types": "./dist/react.d.ts", "default": "./dist/react.js" },
-    "./loader": { "types": "./dist/loader.d.ts", "default": "./dist/loader.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
+    "./loader": {
+      "types": "./dist/loader.d.ts",
+      "default": "./dist/loader.js"
+    }
   },
-  "files": ["dist", "README.md", "LICENSE"],
-  "sideEffects": ["./dist/loader.js"],
-  "engines": { "node": ">=20" },
-  "repository": { "type": "git", "url": "git+https://github.com/snappedcut-dev/embed.git" },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./dist/loader.js"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/snappedcut-dev/embed.git"
+  },
   "homepage": "https://snappedcut.com/docs",
   "bugs": "https://github.com/snappedcut-dev/embed/issues",
-  "keywords": ["snappedcut", "video", "editor", "embed", "iframe", "react", "webcodecs"],
+  "keywords": [
+    "snappedcut",
+    "video",
+    "editor",
+    "embed",
+    "iframe",
+    "react",
+    "webcodecs"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/"
+    "test": "npm run build && node --test test/*.test.mjs"
   },
-  "peerDependencies": { "react": ">=18" },
-  "peerDependenciesMeta": { "react": { "optional": true } },
-  "devDependencies": { "@types/react": "18.3.12", "typescript": "5.9.3" },
-  "publishConfig": { "access": "public", "provenance": true }
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "typescript": "5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }
