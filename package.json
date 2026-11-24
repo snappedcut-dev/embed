@@ -60,8 +60,8 @@
     }
   },
   "devDependencies": {
-    "@types/react": "18.3.12",
-    "typescript": "5.9.3"
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2"
   },
   "publishConfig": {
     "access": "public",
