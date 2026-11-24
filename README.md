@@ -71,21 +71,32 @@ tear the iframe down and remount it on each one. Strict mode's double effect is
 handled too: the first mount's frame is destroyed rather than orphaned with a
 live message listener.
 
-## The processing happens on our servers
+## Where the processing runs
 
-Every decode, composite and encode runs on Snapped Cut's machines, not in the
-visitor's browser. The frame is a thin client: it sends the operation, we render
-it, it shows the result.
+**Today it runs in the visitor's browser.** Decode, compositing and encode all
+happen inside the frame on WebCodecs. A file the visitor opens is read from
+their own disk and never uploaded; there is no queue and no copy on our side.
+If you are writing a privacy policy against this integration, that is the
+sentence to write, and
+[the public manual](https://snappedcut.com/docs/how-it-works) says the same.
 
-That is deliberate, and it is what the key is for. Two things follow that matter
-when you build against this:
+The one exception is **cloud render**, which is explicit and opt-in: the project
+is uploaded as a bundle and rendered on our machines. Nothing reaches us unless
+an operation asks for it.
 
-- **Nothing heavy ships into your page.** The frame does not carry a video
-  engine, so embedding the editor does not cost your users a multi-megabyte
-  download before they can click anything.
-- **Work is metered, because work costs us.** Operations report themselves
-  through the `job` event with `credits` and the `endUserId` from your token, so
-  you can meter per customer:
+Moving the processing server-side is the committed direction, but it is *not*
+what this version does. This section will change when that ships, not before —
+so read it against the version you have installed rather than the roadmap.
+
+Two consequences of the browser path that shape how you embed it:
+
+- **The frame carries the engine, so there is a real first load.** It is
+  code-split and cached, but budget for it rather than assuming a thin client.
+- **Browser support is the engine's support.** WebCodecs is the floor; Safari
+  trails Chromium on it. Check a browser before promising it to your users.
+- **Only work on our machines is metered.** Browser-side editing costs no
+  credits. A cloud render reports itself through the `job` event with `credits`
+  and the `endUserId` from your token, so you can meter per customer:
 
 ```ts
 editor.on('job', ({ endUserId, credits, status }) => bill(endUserId, credits, status));
