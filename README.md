@@ -71,20 +71,29 @@ tear the iframe down and remount it on each one. Strict mode's double effect is
 handled too: the first mount's frame is destroyed rather than orphaned with a
 live message listener.
 
-## The editing happens on your visitor's machine
+## The processing happens on our servers
 
-Decode, cut, filter and encode are WebCodecs calls **inside the frame, in their
-browser**. So `load` and `export` cost nothing, need no round trip, and never
-send their footage anywhere — which is the whole reason to embed this rather
-than an upload form.
+Every decode, composite and encode runs on Snapped Cut's machines, not in the
+visitor's browser. The frame is a thin client: it sends the operation, we render
+it, it shows the result.
 
-The one exception is a **cloud render**, which is opt-in and costs credits. It
-reports itself through the `job` event, with `credits` and the `endUserId` from
-your token, so you can meter per customer:
+That is deliberate, and it is what the key is for. Two things follow that matter
+when you build against this:
+
+- **Nothing heavy ships into your page.** The frame does not carry a video
+  engine, so embedding the editor does not cost your users a multi-megabyte
+  download before they can click anything.
+- **Work is metered, because work costs us.** Operations report themselves
+  through the `job` event with `credits` and the `endUserId` from your token, so
+  you can meter per customer:
 
 ```ts
 editor.on('job', ({ endUserId, credits, status }) => bill(endUserId, credits, status));
 ```
+
+A `load` or an `export` is a round trip, not a local call. Expect the latency of
+a request, and show the `job` event's progress rather than assuming it is
+instant.
 
 ## Keys and tokens
 

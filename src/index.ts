@@ -71,11 +71,11 @@ const TIMEOUT_MS = 60_000;
 /**
  * Loads the Snapped Cut editor into `target` and resolves with a handle to it.
  *
- * The editor runs **in the frame, on the visitor's machine** — decode, cut and
- * encode are WebCodecs calls in their browser, not requests to us. So `load`
- * and `export` cost nothing and need no network once the frame is up, and the
- * only thing that ever reaches our servers is a cloud render, which reports
- * itself through the `job` event.
+ * The frame is a **thin client**: decode, compositing and encode all happen on
+ * Snapped Cut's servers, so nothing heavy ships into the host page and no
+ * engine code reaches the visitor. `load` and `export` are therefore round
+ * trips, not local calls — every one is work we do and meter, and each reports
+ * itself through the `job` event with the credits it cost.
  */
 export async function mount(
   target: string | HTMLElement,
